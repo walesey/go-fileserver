@@ -8,11 +8,13 @@ import (
 	"os"
 
 	"github.com/gorilla/handlers"
+	"github.com/walesey/go-fileserver/files"
 )
 
 func StartServer() {
 	router := http.NewServeMux()
 	router.HandleFunc("/", mainRoute)
+	router.HandleFunc("/files", filesRoute)
 
 	port := os.Getenv("PORT")
 	if len(port) == 0 {
@@ -31,6 +33,17 @@ func StartServer() {
 func mainRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		writeMessage(w, http.StatusOK, "Go File Server")
+	}
+}
+
+func filesRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		if files, err := files.AllFiles("."); err == nil {
+			writeMessage(w, http.StatusOK, files)
+		} else {
+			log.Println(err)
+			writeMessage(w, http.StatusInternalServerError, "Internal Server Error")
+		}
 	}
 }
 
