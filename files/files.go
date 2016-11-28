@@ -1,6 +1,9 @@
 package files
 
 import (
+	"crypto/md5"
+	"encoding/base64"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -8,24 +11,26 @@ import (
 type FileItems []FileItem
 
 type FileItem struct {
-	Name  string    `json:"name"`
-	Hash  string    `json:"hash"`
-	Items FileItems `json:"items"`
+	Name      string    `json:"name"`
+	Hash      string    `json:"hash"`
+	Directory bool      `json:"directory"`
+	Items     FileItems `json:"items"`
 }
 
 func AllFiles(path string) (FileItems, error) {
-	fileNames, err := filepath.Glob(filepath.Join(path, "*"))
+	filePaths, err := filepath.Glob(filepath.Join(path, "*"))
 	if err != nil {
 		return []FileItem{}, err
 	}
 
-	fileItems := make([]FileItem, len(fileNames))
-	for i, name := range fileNames {
-		fPath := filepath.Join(path, name)
+	fileItems := make([]FileItem, len(filePaths))
+	for i, fPath := range filePaths {
+		name := filepath.Base(fPath)
 		f, err := os.Open(fPath)
 		if err != nil {
 			return fileItems, err
 		}
+
 		defer f.Close()
 		fi, err := f.Stat()
 		if err != nil {
@@ -34,15 +39,28 @@ func AllFiles(path string) (FileItems, error) {
 
 		var items FileItems
 		var hash string
-		if fi.Mode().IsDir() {
+		isDirectory := fi.Mode().IsDir()
+		if isDirectory {
 			if items, err = AllFiles(fPath); err != nil {
 				return fileItems, err
 			}
 		} else {
 			items = []FileItem{}
-			// md5.Sum() //TODO
+			fileData, err := ioutil.ReadAll(f)
+			if err != nil {
+				return fileItems, err
+			}
+
+			hashData := md5.Sum(fileData)
+			hash = base64.URLEncoding.EncodeToString(hashData[:])
 		}
-		fileItems[i] = FileItem{Name: name, Hash: hash, Items: items}
+
+		fileItems[i] = FileItem{
+			Name:      name,
+			Hash:      hash,
+			Directory: isDirectory,
+			Items:     items,
+		}
 	}
 	return fileItems, nil
 }
