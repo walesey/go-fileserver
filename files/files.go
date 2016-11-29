@@ -12,6 +12,7 @@ type FileItems []FileItem
 
 type FileItem struct {
 	Name      string    `json:"name"`
+	Size      int       `json:"size"`
 	Hash      string    `json:"hash"`
 	Directory bool      `json:"directory"`
 	Items     FileItems `json:"items"`
@@ -39,6 +40,8 @@ func AllFiles(path string) (FileItems, error) {
 
 		var items FileItems
 		var hash string
+		var size int
+
 		isDirectory := fi.Mode().IsDir()
 		if isDirectory {
 			if items, err = AllFiles(fPath); err != nil {
@@ -51,6 +54,7 @@ func AllFiles(path string) (FileItems, error) {
 				return fileItems, err
 			}
 
+			size = len(fileData)
 			hashData := md5.Sum(fileData)
 			hash = base64.URLEncoding.EncodeToString(hashData[:])
 		}
@@ -58,6 +62,7 @@ func AllFiles(path string) (FileItems, error) {
 		fileItems[i] = FileItem{
 			Name:      name,
 			Hash:      hash,
+			Size:      size,
 			Directory: isDirectory,
 			Items:     items,
 		}
