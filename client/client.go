@@ -3,7 +3,6 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -36,7 +35,7 @@ func (c *Client) SyncFiles(basePath string) {
 	}
 
 	var remoteFiles files.FileItems
-	if err = json.Unmarshal(filesData, &filesData); err != nil {
+	if err = json.Unmarshal(filesData, &remoteFiles); err != nil {
 		panic(err)
 	}
 
@@ -53,10 +52,10 @@ func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) 
 		newPath := filepath.Join(path, name)
 		if file.Directory {
 			if localFile, ok := localFiles[name]; ok {
-				c.syncFile(file.Items, localFile.Items, newPath)
+				c.syncFile(localFile.Items, file.Items, newPath)
 			} else {
 				os.Mkdir(filepath.Join(path, name), 0777)
-				c.syncFile(file.Items, make(map[string]files.FileItem), newPath)
+				c.syncFile(make(map[string]files.FileItem), file.Items, newPath)
 			}
 		} else {
 			if localFile, ok := localFiles[name]; !ok || localFile.Hash != file.Hash {
@@ -67,6 +66,10 @@ func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) 
 }
 
 func (c *Client) downloadFile(path string, file files.FileItem) {
+	if _, err := os.Stat(path); os.IsExist(err) {
+		os.Remove(path)
+	}
+
 	f, err := os.Create(path)
 	if err != nil {
 		panic(err)
@@ -74,15 +77,18 @@ func (c *Client) downloadFile(path string, file files.FileItem) {
 	defer f.Close()
 
 	for offset := 0; offset < file.Size; offset += c.ChunkSize {
-		resp, err := http.Get(fmt.Sprintf("%v/download?path=%v&offset=%v&limit=%v", c.serverAddr, path, offset, c.ChunkSize))
+		resp, err := http.Get(fmt.Sprintf("%v/download?path=%v&offset=%v&length=%v", c.serverAddr, path, offset, c.ChunkSize))
 		if err != nil {
 			panic(err)
 		}
 
-		_, err = io.CopyN(f, resp.Body, int64(c.ChunkSize))
+		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			panic(err)
 		}
 
+		if _, err := f.Write(data); err != nil {
+			panic(err)
+		}
 	}
 }
