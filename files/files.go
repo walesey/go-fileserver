@@ -8,10 +8,9 @@ import (
 	"path/filepath"
 )
 
-type FileItems []FileItem
+type FileItems map[string]FileItem
 
 type FileItem struct {
-	Name      string    `json:"name"`
 	Size      int       `json:"size"`
 	Hash      string    `json:"hash"`
 	Directory bool      `json:"directory"`
@@ -21,11 +20,11 @@ type FileItem struct {
 func AllFiles(path string) (FileItems, error) {
 	filePaths, err := filepath.Glob(filepath.Join(path, "*"))
 	if err != nil {
-		return []FileItem{}, err
+		return map[string]FileItem{}, err
 	}
 
-	fileItems := make([]FileItem, len(filePaths))
-	for i, fPath := range filePaths {
+	fileItems := make(map[string]FileItem)
+	for _, fPath := range filePaths {
 		name := filepath.Base(fPath)
 		f, err := os.Open(fPath)
 		if err != nil {
@@ -48,7 +47,6 @@ func AllFiles(path string) (FileItems, error) {
 				return fileItems, err
 			}
 		} else {
-			items = []FileItem{}
 			fileData, err := ioutil.ReadAll(f)
 			if err != nil {
 				return fileItems, err
@@ -59,8 +57,7 @@ func AllFiles(path string) (FileItems, error) {
 			hash = base64.URLEncoding.EncodeToString(hashData[:])
 		}
 
-		fileItems[i] = FileItem{
-			Name:      name,
+		fileItems[name] = FileItem{
 			Hash:      hash,
 			Size:      size,
 			Directory: isDirectory,
