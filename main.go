@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/walesey/go-fileserver/client"
@@ -19,6 +20,8 @@ func main() {
 		server.StartServer()
 	} else {
 		c := client.NewClient("http://localhost:3000")
-		c.SyncFiles(".")
+		if err := c.SyncFiles("."); err != nil {
+			log.Println(err)
+		}
 	}
 }
