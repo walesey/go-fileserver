@@ -71,7 +71,11 @@ func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) 
 			if localFile, ok := localFiles[name]; !ok || localFile.Hash != file.Hash {
 				err = c.downloadFile(newPath, file)
 			}
-			c.Complete <- name
+
+			select { // Don't block when channel is full
+			case c.Complete <- name:
+			default:
+			}
 		}
 
 		if err != nil {
