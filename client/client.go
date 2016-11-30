@@ -5,25 +5,30 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+
+	"strconv"
 
 	"github.com/walesey/go-fileserver/files"
 )
 
 type Client struct {
+	basePath   string
 	serverAddr string
 	ChunkSize  int
 }
 
-func NewClient(serverAddr string) *Client {
+func NewClient(basePath, serverAddr string) *Client {
 	return &Client{
+		basePath:   basePath,
 		serverAddr: serverAddr,
 		ChunkSize:  100000,
 	}
 }
 
-func (c *Client) SyncFiles(basePath string) error {
+func (c *Client) SyncFiles() error {
 	resp, err := http.Get(fmt.Sprint(c.serverAddr, "/files"))
 	if err != nil {
 		return err
@@ -39,12 +44,12 @@ func (c *Client) SyncFiles(basePath string) error {
 		return err
 	}
 
-	localFiles, err := files.AllFiles(basePath)
+	localFiles, err := files.AllFiles(c.basePath)
 	if err != nil {
 		return err
 	}
 
-	return c.syncFile(localFiles, remoteFiles, basePath)
+	return c.syncFile(localFiles, remoteFiles, ".")
 }
 
 func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) error {
@@ -55,7 +60,7 @@ func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) 
 			if localFile, ok := localFiles[name]; ok {
 				err = c.syncFile(localFile.Items, file.Items, newPath)
 			} else {
-				os.Mkdir(filepath.Join(path, name), 0777)
+				os.Mkdir(filepath.Join(c.basePath, newPath), 0777)
 				err = c.syncFile(make(map[string]files.FileItem), file.Items, newPath)
 			}
 		} else {
@@ -72,18 +77,23 @@ func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) 
 }
 
 func (c *Client) downloadFile(path string, file files.FileItem) error {
-	if _, err := os.Stat(path); os.IsExist(err) {
-		os.Remove(path)
+	localPath := filepath.Join(c.basePath, path)
+	if _, err := os.Stat(localPath); os.IsExist(err) {
+		os.Remove(localPath)
 	}
 
-	f, err := os.Create(path)
+	f, err := os.Create(localPath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
 	for offset := 0; offset < file.Size; offset += c.ChunkSize {
-		resp, err := http.Get(fmt.Sprintf("%v/download?path=%v&offset=%v&length=%v", c.serverAddr, path, offset, c.ChunkSize))
+		query := url.Values{}
+		query.Set("path", path)
+		query.Set("offset", strconv.Itoa(offset))
+		query.Set("length", strconv.Itoa(c.ChunkSize))
+		resp, err := http.Get(fmt.Sprintf("%v/download?%v", c.serverAddr, query.Encode()))
 		if err != nil {
 			return err
 		}

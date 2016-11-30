@@ -35,13 +35,14 @@ func main() {
 		if len(os.Args) >= 2 {
 			addr = os.Args[1]
 		}
-		c := client.NewClient(addr)
 
 		path := "."
 		if len(os.Args) >= 3 {
 			path = os.Args[2]
 		}
-		if err := c.SyncFiles(path); err != nil {
+
+		c := client.NewClient(path, addr)
+		if err := c.SyncFiles(); err != nil {
 			log.Println(err)
 		}
 	}

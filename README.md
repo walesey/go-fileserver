@@ -16,8 +16,8 @@ import (
 	server.NewServer(".").Start(3000)
 
 // sync directory with server
-c := client.NewClient("http://localhost:3000")
-if err := c.SyncFiles("."); err != nil {
+c := client.NewClient(".", "http://localhost:3000")
+if err := c.SyncFiles(); err != nil {
 	log.Println(err)
 }
 
