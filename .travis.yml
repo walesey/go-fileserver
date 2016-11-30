@@ -2,7 +2,3 @@ language: go
 
 go:
     - 1.7.2
-
-sudo: false
-
-script: go test ./...

@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/walesey/go-fileserver/client"
-	"github.com/walesey/go-fileserver/server"
 )
 
 const testDir = "./testData"
@@ -22,9 +21,7 @@ type fileHash struct {
 
 func TestMain(m *testing.M) {
 	//setup
-	os.RemoveAll(resultDir)
-	os.Mkdir(resultDir, 0777)
-	go server.NewServer(testDir).Start(3000)
+	RunTestServer(testDir, resultDir)
 
 	time.Sleep(1 * time.Second)
 
