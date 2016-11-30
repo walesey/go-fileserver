@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -42,8 +43,19 @@ func main() {
 		}
 
 		c := client.NewClient(path, addr)
-		if err := c.SyncFiles(); err != nil {
-			log.Println(err)
+		inProgress := true
+		go func() {
+			if err := c.SyncFiles(); err != nil {
+				log.Println(err)
+			}
+			inProgress = false
+		}()
+
+		completed := 0
+		for inProgress {
+			complete := <-c.Complete
+			completed++
+			fmt.Printf("%v/%v --> %v\n", completed, c.TotalFiles, complete)
 		}
 	}
 }

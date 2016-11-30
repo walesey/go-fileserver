@@ -17,6 +17,18 @@ type FileItem struct {
 	Items     FileItems `json:"items"`
 }
 
+func (fi FileItems) Count() int {
+	result := 0
+	for _, f := range fi {
+		if !f.Directory {
+			result++
+		} else if f.Items != nil {
+			result += f.Items.Count()
+		}
+	}
+	return result
+}
+
 func AllFiles(path string) (FileItems, error) {
 	filePaths, err := filepath.Glob(filepath.Join(path, "*"))
 	if err != nil {

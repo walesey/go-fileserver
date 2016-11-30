@@ -18,6 +18,8 @@ type Client struct {
 	basePath   string
 	serverAddr string
 	ChunkSize  int
+	TotalFiles int
+	Complete   chan string
 }
 
 func NewClient(basePath, serverAddr string) *Client {
@@ -25,6 +27,7 @@ func NewClient(basePath, serverAddr string) *Client {
 		basePath:   basePath,
 		serverAddr: serverAddr,
 		ChunkSize:  100000,
+		Complete:   make(chan string, 32),
 	}
 }
 
@@ -43,6 +46,7 @@ func (c *Client) SyncFiles() error {
 	if err = json.Unmarshal(filesData, &remoteFiles); err != nil {
 		return err
 	}
+	c.TotalFiles = remoteFiles.Count()
 
 	localFiles, err := files.AllFiles(c.basePath)
 	if err != nil {
@@ -67,6 +71,7 @@ func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) 
 			if localFile, ok := localFiles[name]; !ok || localFile.Hash != file.Hash {
 				err = c.downloadFile(newPath, file)
 			}
+			c.Complete <- name
 		}
 
 		if err != nil {
