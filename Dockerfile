@@ -5,4 +5,4 @@ WORKDIR /go/src/github.com/walesey/go-fileserver
 
 RUN go build
 
-CMD ./go-fileserver server 3000
+CMD ./go-fileserver server 3000 ./serverFiles
