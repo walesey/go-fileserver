@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-
 	"strconv"
 
 	"github.com/walesey/go-fileserver/files"

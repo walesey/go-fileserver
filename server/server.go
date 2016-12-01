@@ -8,10 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-
 	"strconv"
 
-	"github.com/gorilla/handlers"
 	"github.com/walesey/go-fileserver/files"
 )
 
@@ -33,7 +31,7 @@ func (s *Server) Start(port int) {
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%v", port),
-		Handler: handlers.LoggingHandler(os.Stdout, router),
+		Handler: router,
 	}
 
 	log.Printf("Listening on port: %v", port)
