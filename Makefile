@@ -2,6 +2,10 @@ CONTAINER_NAME = gofileserver
 IMAGE_NAME = gofileserver
 HOST_PORT = 3000
 
+runTests:
+	go get -t ./...
+	go test ./...
+
 stopDockerApp:
 	-docker rm -f $(CONTAINER_NAME)
 
