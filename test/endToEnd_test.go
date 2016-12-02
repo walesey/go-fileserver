@@ -56,7 +56,7 @@ func summarizeFiles(dirPath string) ([]fileHash, error) {
 
 func TestFileSync(t *testing.T) {
 	c := client.NewClient(resultDir, "http://127.0.0.1:3000")
-	err := c.SyncFiles()
+	err := c.SyncFiles(".")
 	assert.Nil(t, err)
 
 	// get expected content from the test directory
