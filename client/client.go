@@ -30,8 +30,10 @@ func NewClient(basePath, serverAddr string) *Client {
 	}
 }
 
-func (c *Client) SyncFiles() error {
-	resp, err := http.Get(fmt.Sprint(c.serverAddr, "/files"))
+func (c *Client) SyncFiles(path string) error {
+	query := url.Values{}
+	query.Set("path", path)
+	resp, err := http.Get(fmt.Sprint(c.serverAddr, "/files?", query.Encode()))
 	if err != nil {
 		return err
 	}
@@ -52,23 +54,24 @@ func (c *Client) SyncFiles() error {
 		return err
 	}
 
-	return c.syncFile(localFiles, remoteFiles, ".")
+	return c.syncFile(localFiles, remoteFiles, ".", path)
 }
 
-func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) error {
+func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path, remotepath string) error {
 	for name, file := range remoteFiles {
 		var err error
 		newPath := filepath.Join(path, name)
+		newRemotePath := filepath.Join(remotepath, name)
 		if file.Directory {
 			if localFile, ok := localFiles[name]; ok {
-				err = c.syncFile(localFile.Items, file.Items, newPath)
+				err = c.syncFile(localFile.Items, file.Items, newPath, newRemotePath)
 			} else {
 				os.Mkdir(filepath.Join(c.basePath, newPath), 0777)
-				err = c.syncFile(make(map[string]files.FileItem), file.Items, newPath)
+				err = c.syncFile(make(map[string]files.FileItem), file.Items, newPath, newRemotePath)
 			}
 		} else {
 			if localFile, ok := localFiles[name]; !ok || localFile.Hash != file.Hash {
-				err = c.downloadFile(newPath, file)
+				err = c.downloadFile(newPath, newRemotePath, file)
 			}
 
 			select { // Don't block when channel is full
@@ -84,7 +87,7 @@ func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path string) 
 	return nil
 }
 
-func (c *Client) downloadFile(path string, file files.FileItem) error {
+func (c *Client) downloadFile(path, remotepath string, file files.FileItem) error {
 	localPath := filepath.Join(c.basePath, path)
 	if _, err := os.Stat(localPath); os.IsExist(err) {
 		os.Remove(localPath)
@@ -98,7 +101,7 @@ func (c *Client) downloadFile(path string, file files.FileItem) error {
 
 	for offset := 0; offset < file.Size; offset += c.ChunkSize {
 		query := url.Values{}
-		query.Set("path", path)
+		query.Set("path", remotepath)
 		query.Set("offset", strconv.Itoa(offset))
 		query.Set("length", strconv.Itoa(c.ChunkSize))
 		resp, err := http.Get(fmt.Sprintf("%v/download?%v", c.serverAddr, query.Encode()))

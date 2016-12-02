@@ -17,7 +17,7 @@ import (
 
 // sync directory with server
 c := client.NewClient(".", "http://localhost:3000")
-if err := c.SyncFiles(); err != nil {
+if err := c.SyncFiles("."); err != nil {
 	log.Println(err)
 }
 
@@ -28,11 +28,11 @@ if err := c.SyncFiles(); err != nil {
 * Start server (on port 3000)
 
 ```
-  $ go-fileserver server 3000
+  $ go-fileserver -server -port 3000 -path ./path/to/files
 ```
 
 * Run sync against the server (into the current directory)
 
 ```
-  $ go-fileserver http://localhost:3000 .
+  $ go-fileserver -host localhost -port 3000 -path ./remote/path -out .
 ```

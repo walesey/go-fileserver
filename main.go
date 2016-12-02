@@ -1,10 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
-	"os"
-	"strconv"
 
 	"github.com/walesey/go-fileserver/client"
 	"github.com/walesey/go-fileserver/server"
@@ -13,39 +12,21 @@ import (
 var serverAddr string
 
 func main() {
-	isServer := false
-	if len(os.Args) >= 2 {
-		isServer = os.Args[1] == "server"
-	}
+	isServer := flag.Bool("server", false, "Server Mode")
+	host := flag.String("host", "localhost", "Hostname of server")
+	port := flag.Int64("port", 3000, "Port to listen on")
+	path := flag.String("path", ".", "Remote path to download")
+	localpath := flag.String("out", ".", "Local destination path")
+	flag.Parse()
 
-	if isServer { // server
-		var port int64 = 3000
-		if len(os.Args) >= 3 {
-			port, _ = strconv.ParseInt(os.Args[2], 10, 64)
-		}
-
-		path := "."
-		if len(os.Args) >= 4 {
-			path = os.Args[3]
-		}
-
-		server.NewServer(path).Start(int(port))
+	if *isServer { // server
+		server.NewServer(*path).Start(int(*port))
 
 	} else { // client
-		addr := "http://localhost:3000"
-		if len(os.Args) >= 2 {
-			addr = os.Args[1]
-		}
-
-		path := "."
-		if len(os.Args) >= 3 {
-			path = os.Args[2]
-		}
-
-		c := client.NewClient(path, addr)
+		c := client.NewClient(*localpath, fmt.Sprintf("http://%v:%v", *host, *port))
 		inProgress := true
 		go func() {
-			if err := c.SyncFiles(); err != nil {
+			if err := c.SyncFiles(*path); err != nil {
 				log.Println(err)
 			}
 			inProgress = false
@@ -55,7 +36,7 @@ func main() {
 		for inProgress {
 			complete := <-c.Complete
 			completed++
-			fmt.Printf("%v/%v --> %v\n", completed, c.TotalFiles, complete)
+			fmt.Printf("http://%v/%v --> %v\n", completed, c.TotalFiles, complete)
 		}
 	}
 }
