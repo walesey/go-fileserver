@@ -36,7 +36,7 @@ func main() {
 		for inProgress {
 			complete := <-c.Complete
 			completed++
-			fmt.Printf("http://%v/%v --> %v\n", completed, c.TotalFiles, complete)
+			fmt.Printf("%v/%v --> %v\n", completed, c.TotalFiles, complete)
 		}
 	}
 }
