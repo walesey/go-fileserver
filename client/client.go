@@ -32,7 +32,7 @@ func NewClient(basePath, serverAddr string) *Client {
 
 func (c *Client) SyncFiles(path string) error {
 	query := url.Values{}
-	query.Set("path", path)
+	query.Set("path", filepath.ToSlash(path))
 	resp, err := http.Get(fmt.Sprint(c.serverAddr, "/files?", query.Encode()))
 	if err != nil {
 		return err
@@ -101,7 +101,7 @@ func (c *Client) downloadFile(path, remotepath string, file files.FileItem) erro
 
 	for offset := 0; offset < file.Size; offset += c.ChunkSize {
 		query := url.Values{}
-		query.Set("path", remotepath)
+		query.Set("path", filepath.ToSlash(remotepath))
 		query.Set("offset", strconv.Itoa(offset))
 		query.Set("length", strconv.Itoa(c.ChunkSize))
 		resp, err := http.Get(fmt.Sprintf("%v/download?%v", c.serverAddr, query.Encode()))

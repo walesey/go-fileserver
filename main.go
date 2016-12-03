@@ -14,7 +14,7 @@ var serverAddr string
 func main() {
 	isServer := flag.Bool("server", false, "Server Mode")
 	host := flag.String("host", "localhost", "Hostname of server")
-	port := flag.Int64("port", 3000, "Port to listen on")
+	port := flag.Int64("port", 80, "Port to listen on")
 	path := flag.String("path", ".", "Remote path to download")
 	localpath := flag.String("out", ".", "Local destination path")
 	flag.Parse()
