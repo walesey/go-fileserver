@@ -14,29 +14,21 @@ var serverAddr string
 func main() {
 	isServer := flag.Bool("server", false, "Server Mode")
 	host := flag.String("host", "localhost", "Hostname of server")
-	port := flag.Int64("port", 80, "Port to listen on")
-	path := flag.String("path", ".", "Remote path to download")
+	port := flag.Int64("port", 11862, "Port to listen on")
+	remotePath := flag.String("path", ".", "Remote path to download")
 	localpath := flag.String("out", ".", "Local destination path")
+	quiet := flag.Bool("quiet", false, "run in quiet mode")
 	flag.Parse()
 
-	if *isServer { // server
-		server.NewServer(*path).Start(int(*port))
-
-	} else { // client
-		c := client.NewClient(*localpath, fmt.Sprintf("http://%v:%v", *host, *port))
-		inProgress := true
-		go func() {
-			if err := c.SyncFiles(*path); err != nil {
-				log.Println(err)
-			}
-			inProgress = false
-		}()
-
-		completed := 0
-		for inProgress {
-			complete := <-c.Complete
-			completed++
-			fmt.Printf("%v/%v --> %v\n", completed, c.TotalFiles, complete)
+	if *isServer {
+		log.Println("Running Server")
+		server.NewServer(*remotePath).Start(int(*port))
+	} else {
+		log.Println("Running Client")
+		c := client.New(*localpath, fmt.Sprintf("http://%v:%v", *host, *port))
+		c.Quiet = *quiet
+		if err := c.SyncFiles(*remotePath); err != nil {
+			log.Fatal(err)
 		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/walesey/go-fileserver/client"
+	"github.com/walesey/go-fileserver/server"
 )
 
 const testDir = "./testData"
@@ -21,7 +22,9 @@ type fileHash struct {
 
 func TestMain(m *testing.M) {
 	//setup
-	RunTestServer(testDir, resultDir)
+	os.RemoveAll(resultDir)
+	os.Mkdir(resultDir, 0777)
+	go server.NewServer(testDir).Start(3000)
 
 	time.Sleep(1 * time.Second)
 
@@ -55,7 +58,7 @@ func summarizeFiles(dirPath string) ([]fileHash, error) {
 }
 
 func TestFileSync(t *testing.T) {
-	c := client.NewClient(resultDir, "http://127.0.0.1:3000")
+	c := client.New(resultDir, "http://127.0.0.1:3000")
 	err := c.SyncFiles(".")
 	assert.Nil(t, err)
 
@@ -63,7 +66,7 @@ func TestFileSync(t *testing.T) {
 	expectedFiles, err := summarizeFiles(testDir)
 	assert.Nil(t, err)
 
-	// // check the expected content against the destination directory
+	// check the expected content against the destination directory
 	actualFiles, err := summarizeFiles(resultDir)
 	assert.Nil(t, err)
 

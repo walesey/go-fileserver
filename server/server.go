@@ -48,7 +48,7 @@ func (s *Server) mainRoute(w http.ResponseWriter, r *http.Request) {
 func (s *Server) filesRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		path := s.parsePath(r)
-		if files, err := files.AllFiles(path); err == nil {
+		if files, err := files.GetFileItems(path); err == nil {
 			s.writeMessage(w, http.StatusOK, files)
 		} else {
 			log.Println(err)

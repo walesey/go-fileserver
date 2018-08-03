@@ -1,6 +1,8 @@
 package client
 
 import (
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,115 +10,178 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 
+	"github.com/pkg/errors"
 	"github.com/walesey/go-fileserver/files"
 )
 
 type Client struct {
-	basePath   string
-	serverAddr string
-	ChunkSize  int
-	TotalFiles int
-	Complete   chan string
+	localBasePath              string
+	serverAddr                 string
+	Quiet                      bool
+	bytesDone, totalDeltaBytes int64
+	filesDone, totalDeltaFiles int
 }
 
-func NewClient(basePath, serverAddr string) *Client {
-	return &Client{
-		basePath:   basePath,
-		serverAddr: serverAddr,
-		ChunkSize:  100000,
-		Complete:   make(chan string, 32),
+func New(localBasePath, serverAddr string) Client {
+	return Client{
+		localBasePath: localBasePath,
+		serverAddr:    serverAddr,
 	}
 }
 
 func (c *Client) SyncFiles(path string) error {
-	query := url.Values{}
-	query.Set("path", filepath.ToSlash(path))
-	resp, err := http.Get(fmt.Sprint(c.serverAddr, "/files?", query.Encode()))
+	remoteFiles, err := c.getRemoteFiles(path)
 	if err != nil {
 		return err
 	}
 
-	filesData, err := ioutil.ReadAll(resp.Body)
+	localFiles, err := files.GetFileItems(c.localBasePath)
 	if err != nil {
 		return err
 	}
 
-	var remoteFiles files.FileItems
-	if err = json.Unmarshal(filesData, &remoteFiles); err != nil {
-		return err
-	}
-	c.TotalFiles = remoteFiles.Count()
+	c.filesDone, c.totalDeltaFiles = 0, remoteFiles.Count()
+	c.bytesDone, c.totalDeltaBytes = 0, remoteFiles.Size(localFiles)
 
-	localFiles, err := files.AllFiles(c.basePath)
-	if err != nil {
-		return err
-	}
-
-	return c.syncFile(localFiles, remoteFiles, ".", path)
+	return c.syncFiles(localFiles, remoteFiles, c.localBasePath, path)
 }
 
-func (c *Client) syncFile(localFiles, remoteFiles files.FileItems, path, remotepath string) error {
-	for name, file := range remoteFiles {
+func (c *Client) syncFiles(localFiles, remoteFiles files.FileItems, localPath, remotePath string) error {
+	for name, remoteFile := range remoteFiles {
 		var err error
-		newPath := filepath.Join(path, name)
-		newRemotePath := filepath.Join(remotepath, name)
-		if file.Directory {
-			if localFile, ok := localFiles[name]; ok {
-				err = c.syncFile(localFile.Items, file.Items, newPath, newRemotePath)
-			} else {
-				os.Mkdir(filepath.Join(c.basePath, newPath), 0777)
-				err = c.syncFile(make(map[string]files.FileItem), file.Items, newPath, newRemotePath)
+		newLocalPath := filepath.Join(localPath, name)
+		newRemotePath := filepath.Join(remotePath, name)
+		localFile, localFileExists := localFiles[name]
+		if remoteFile.Directory {
+			if !localFileExists {
+				os.Mkdir(newLocalPath, 0777)
+				localFile = files.FileItem{Items: make(map[string]files.FileItem)}
+			}
+			if err = c.syncFiles(localFile.Items, remoteFile.Items, newLocalPath, newRemotePath); err != nil {
+				return err
 			}
 		} else {
-			if localFile, ok := localFiles[name]; !ok || localFile.Hash != file.Hash {
-				err = c.downloadFile(newPath, newRemotePath, file)
+			if !localFileExists || localFile.Hash != remoteFile.Hash {
+				if err = c.downloadFile(newLocalPath, newRemotePath, localFile, remoteFile); err != nil {
+					return errors.Wrap(err, "unable to download file")
+				}
 			}
 
-			select { // Don't block when channel is full
-			case c.Complete <- name:
-			default:
+			c.filesDone++
+			if !c.Quiet {
+				fmt.Printf("%v/%v --> %v\n", c.filesDone, c.totalDeltaFiles, name)
 			}
-		}
-
-		if err != nil {
-			return err
 		}
 	}
 	return nil
 }
 
-func (c *Client) downloadFile(path, remotepath string, file files.FileItem) error {
-	localPath := filepath.Join(c.basePath, path)
-	if _, err := os.Stat(localPath); os.IsExist(err) {
-		os.Remove(localPath)
-	}
+func (c *Client) downloadFile(localPath, remotePath string, localFile, remoteFile files.FileItem) error {
+	_, err := os.Stat(localPath)
+	deltaFound := !os.IsExist(err)
 
 	f, err := os.Create(localPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "unable to create file locally")
 	}
 	defer f.Close()
 
-	for offset := 0; offset < file.Size; offset += c.ChunkSize {
+	offset := int64(0)
+	var buf []byte
+	for _, chunk := range remoteFile.Chunks {
+		if !deltaFound {
+			if int64(len(buf)) != chunk.Size {
+				buf = make([]byte, chunk.Size)
+			}
+
+			n, err := f.Read(buf)
+			if err != nil {
+				return errors.Wrap(err, "unable to read file locally")
+			}
+
+			hashData := md5.Sum(buf[:n])
+			localHash := base64.URLEncoding.EncodeToString(hashData[:])
+			deltaFound = chunk.Hash != localHash
+			if deltaFound {
+				if _, err := f.Seek(offset, 0); err != nil {
+					return errors.Wrap(err, "unable to seek file locally")
+				}
+			} else {
+				continue
+			}
+		}
+
 		query := url.Values{}
-		query.Set("path", filepath.ToSlash(remotepath))
-		query.Set("offset", strconv.Itoa(offset))
-		query.Set("length", strconv.Itoa(c.ChunkSize))
+		query.Set("path", filepath.ToSlash(remotePath))
+		query.Set("offset", fmt.Sprint(offset))
+		query.Set("length", fmt.Sprint(chunk.Size))
 		resp, err := http.Get(fmt.Sprintf("%v/download?%v", c.serverAddr, query.Encode()))
 		if err != nil {
-			return err
+			return errors.Wrap(err, "unable to download file remotely")
 		}
 
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "unable to read http response")
 		}
 
 		if _, err := f.Write(data); err != nil {
-			return err
+			return errors.Wrap(err, "unable to write to local file")
 		}
+		f.Sync()
+
+		c.bytesDone += chunk.Size
+		if !c.Quiet {
+			fmt.Printf("%v/%v\n", formatBytes(c.bytesDone), formatBytes(c.totalDeltaBytes))
+		}
+
+		offset += chunk.Size
 	}
+
 	return nil
+}
+
+func (c *Client) getRemoteFiles(path string) (files.FileItems, error) {
+	query := url.Values{}
+	query.Set("path", filepath.ToSlash(path))
+	resp, err := http.Get(fmt.Sprint(c.serverAddr, "/files?", query.Encode()))
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to fetch /files")
+	}
+
+	filesData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to read to /files http body")
+	}
+
+	var remoteFiles files.FileItems
+	if err = json.Unmarshal(filesData, &remoteFiles); err != nil {
+		return nil, errors.Wrap(err, "unable to unmarshal /files http body")
+	}
+
+	return remoteFiles, nil
+}
+
+const (
+	terabyte = 1000000000000
+	gigabyte = 1000000000
+	megabyte = 1000000
+	kilobyte = 1000
+)
+
+func formatBytes(nbBytes int64) string {
+	if nbBytes >= terabyte*10 {
+		return fmt.Sprintf("%vTb", nbBytes/terabyte)
+	}
+	if nbBytes >= gigabyte*10 {
+		return fmt.Sprintf("%vGb", nbBytes/gigabyte)
+	}
+	if nbBytes >= megabyte*10 {
+		return fmt.Sprintf("%vMb", nbBytes/megabyte)
+	}
+	if nbBytes >= kilobyte*10 {
+		return fmt.Sprintf("%vKb", nbBytes/kilobyte)
+	}
+	return fmt.Sprintf("%vb", nbBytes)
 }
