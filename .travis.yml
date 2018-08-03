@@ -1,6 +1,4 @@
 language: go
 
 go:
-    - 1.7.2
-
-script: make runTests
+    - 1.10.3
