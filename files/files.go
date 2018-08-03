@@ -11,7 +11,7 @@ import (
 
 const (
 	minChunkSize     = 64000
-	maxChunksPerFile = 32
+	maxChunksPerFile = 128
 )
 
 // FileItems map of file items
