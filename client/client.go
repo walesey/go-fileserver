@@ -150,6 +150,10 @@ func (c *Client) getRemoteFiles(path string) (files.FileItems, error) {
 		return nil, errors.Wrap(err, "unable to fetch /files")
 	}
 
+	if resp.StatusCode >= 400 {
+		return nil, errors.Errorf("unable to read to /files http body (%v)", resp.StatusCode)
+	}
+
 	filesData, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read to /files http body")
