@@ -4,20 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/walesey/go-fileserver/files"
 )
 
 // Server ...
 type Server struct {
 	BasePath string
-	Quiet    bool
 	manifest files.FileItems
 }
 
@@ -46,7 +45,7 @@ func (s *Server) Start(port int) error {
 		Handler: router,
 	}
 
-	log.Printf("Listening on port: %v", port)
+	log.Infof("Listening on port: %v", port)
 	return httpServer.ListenAndServe()
 }
 
@@ -59,9 +58,7 @@ func (s *Server) mainRoute(w http.ResponseWriter, r *http.Request) {
 func (s *Server) filesRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		path := r.URL.Query().Get("path")
-		if !s.Quiet {
-			log.Printf("getting files for path='%v'\n", path)
-		}
+		log.Infof("getting files for path='%s'", path)
 
 		pathParts := strings.Split(path, "/")
 		files := s.manifest
@@ -88,10 +85,7 @@ func (s *Server) downloadRoute(w http.ResponseWriter, r *http.Request) {
 		length, _ := strconv.ParseInt(r.URL.Query().Get("length"), 10, 64)
 		path := s.parsePath(r)
 
-		if !s.Quiet {
-			log.Printf("serving file - path='%v'\n", path)
-		}
-
+		log.Infof("serving file - path='%s'", path)
 		file, _ := os.Open(path)
 		defer file.Close()
 		file.Seek(offset, os.SEEK_SET)
@@ -125,7 +119,7 @@ func (s *Server) writeMessage(w http.ResponseWriter, status int, message interfa
 			w.WriteHeader(status)
 			w.Write(data)
 		} else {
-			log.Println(err)
+			log.Errorf("error writing http message: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Internal Server Error"))
 		}

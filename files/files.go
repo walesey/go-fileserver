@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -90,6 +92,7 @@ func (cs ChunkSlice) CalculateHash() string {
 
 // GetFileItems - return the file data for the given basepath
 func GetFileItems(basepath string) (FileItems, error) {
+	log.Infof("Getting file data for: %s", basepath)
 	filePaths, err := filepath.Glob(filepath.Join(basepath, "*"))
 	if err != nil {
 		return map[string]FileItem{}, err
@@ -142,6 +145,7 @@ func calculateChunks(f *os.File, fi os.FileInfo) (ChunkSlice, error) {
 		chunkSize = int64(math.Ceil(float64(fi.Size()) / float64(nbChunks)))
 	}
 
+	log.Infof("Calculating %d chunks: %s", nbChunks, f.Name())
 	chunks := make(ChunkSlice, nbChunks)
 	buf := make([]byte, chunkSize)
 

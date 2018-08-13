@@ -12,13 +12,13 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/walesey/go-fileserver/files"
 )
 
 type Client struct {
 	localBasePath              string
 	serverAddr                 string
-	Quiet                      bool
 	bytesDone, totalDeltaBytes int64
 	filesDone, totalDeltaFiles int
 }
@@ -69,9 +69,7 @@ func (c *Client) syncFiles(localFiles, remoteFiles files.FileItems, localPath, r
 			}
 
 			c.filesDone++
-			if !c.Quiet {
-				fmt.Printf("%v/%v --> %v\n", c.filesDone, c.totalDeltaFiles, name)
-			}
+			log.Infof("%v/%v --> %v\n", c.filesDone, c.totalDeltaFiles, name)
 		}
 	}
 	return nil
@@ -132,9 +130,7 @@ func (c *Client) downloadFile(localPath, remotePath string, localFile, remoteFil
 		f.Sync()
 
 		c.bytesDone += chunk.Size
-		if !c.Quiet {
-			fmt.Printf("%v/%v\n", formatBytes(c.bytesDone), formatBytes(c.totalDeltaBytes))
-		}
+		log.Infof("%v/%v\n", formatBytes(c.bytesDone), formatBytes(c.totalDeltaBytes))
 
 		offset += chunk.Size
 	}

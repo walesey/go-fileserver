@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/walesey/go-fileserver/client"
 	"github.com/walesey/go-fileserver/server"
 )
@@ -20,13 +20,18 @@ func main() {
 	quiet := flag.Bool("quiet", false, "run in quiet mode")
 	flag.Parse()
 
+	if *quiet {
+		log.SetLevel(log.ErrorLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+
 	if *isServer {
-		log.Println("Running Server")
+		log.Info("Running Server")
 		server.NewServer(*remotePath).Start(int(*port))
 	} else {
-		log.Println("Running Client")
+		log.Info("Running Client")
 		c := client.New(*localpath, fmt.Sprintf("http://%v:%v", *host, *port))
-		c.Quiet = *quiet
 		if err := c.SyncFiles(*remotePath); err != nil {
 			log.Fatal(err)
 		}
